@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EVE Healthcare Frontend</title>
+    <style>
+      :root {
+        --bg: #f4f7fb;
+        --card: #ffffff;
+        --primary: #1d4ed8;
+        --text: #0f172a;
+        --muted: #475569;
+        --border: #dbe3ef;
+        --success: #166534;
+        --danger: #b91c1c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .container {
+        max-width: 1100px;
+        margin: 40px auto;
+        padding: 0 20px 40px;
+      }
+      h1, h2 { margin-bottom: 12px; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+      }
+      label {
+        display: block;
+        margin: 10px 0 6px;
+        font-weight: 600;
+      }
+      input, button {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        font-size: 14px;
+      }
+      button {
+        margin-top: 12px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button.secondary {
+        background: #0f172a;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #eff6ff;
+        color: var(--text);
+        white-space: pre-wrap;
+      }
+      .success { background: #ecfdf5; color: var(--success); }
+      .error { background: #fef2f2; color: var(--danger); }
+      pre {
+        margin-top: 12px;
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: 12px;
+        border-radius: 8px;
+        overflow: auto;
+        max-height: 200px;
+      }
+      .token-box {
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>EVE Healthcare</h1>
+      <div class="grid">
+        <div class="card">
+          <h2>Sign up</h2>
+          <label>Full Name</label>
+          <input id="signupName" value="Jane Doe" />
+          <label>Email</label>
+          <input id="signupEmail" value="jane@example.com" />
+          <label>Password</label>
+          <input id="signupPassword" type="password" value="StrongPass123" />
+          <button onclick="signup()">Create account</button>
+        </div>
+
+        <div class="card">
+          <h2>Login</h2>
+          <label>Email</label>
+          <input id="loginEmail" value="jane@example.com" />
+          <label>Password</label>
+          <input id="loginPassword" type="password" value="StrongPass123" />
+          <button onclick="login()">Login</button>
+          <div id="tokenStatus" class="status token-box">No token yet.</div>
+        </div>
+
+        <div class="card">
+          <h2>Create Centre</h2>
+          <label>Name</label>
+          <input id="centreName" value="City Diagnostics" />
+          <label>Location</label>
+          <input id="centreLocation" value="Kolkata" />
+          <button class="secondary" onclick="createCentre()">Create centre</button>
+        </div>
+
+        <div class="card">
+          <h2>Create Test</h2>
+          <label>Centre ID</label>
+          <input id="testCentreId" placeholder="Paste centre id here" />
+          <label>Test Name</label>
+          <input id="testName" value="Complete Blood Count" />
+          <label>Price</label>
+          <input id="testPrice" type="number" value="499" />
+          <button class="secondary" onclick="createTest()">Add test</button>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:20px;">
+        <div class="card" style="grid-column:1 / -1;">
+          <h2>List Centres</h2>
+          <button onclick="listCentres()">Load centres</button>
+          <pre id="centresOutput">{}</pre>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API = 'http://localhost:8000';
+      let token = '';
+
+      function setStatus(elId, message, type = '') {
+        const el = document.getElementById(elId);
+        el.textContent = message;
+        el.className = 'status ' + type;
+      }
+
+      async function apiRequest(path, options = {}) {
+        const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+        const response = await fetch(`${API}${path}`, {
+          ...options,
+          headers,
+        });
+
+        const text = await response.text();
+        let data = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch (err) {
+          data = text;
+        }
+
+        if (!response.ok) {
+          throw new Error(data?.detail || JSON.stringify(data) || 'Request failed');
+        }
+
+        return data;
+      }
+
+      async function signup() {
+        try {
+          const payload = {
+            email: document.getElementById('signupEmail').value,
+            password: document.getElementById('signupPassword').value,
+            full_name: document.getElementById('signupName').value,
+          };
+          const result = await apiRequest('/auth/signup', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          setStatus('tokenStatus', `User created successfully:\n${JSON.stringify(result, null, 2)}`, 'success');
+        } catch (err) {
+          setStatus('tokenStatus', `Signup failed: ${err.message}`, 'error');
+        }
+      }
+
+      async function login() {
+        try {
+          const payload = {
+            email: document.getElementById('loginEmail').value,
+            password: document.getElementById('loginPassword').value,
+          };
+          const result = await apiRequest('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          token = result.access_token;
+          setStatus('tokenStatus', `Token saved:\n${token}`, 'success');
+        } catch (err) {
+          setStatus('tokenStatus', `Login failed: ${err.message}`, 'error');
+        }
+      }
+
+      async function createCentre() {
+        try {
+          if (!token) throw new Error('Please login first.');
+          const payload = {
+            name: document.getElementById('centreName').value,
+            location: document.getElementById('centreLocation').value,
+          };
+          const result = await apiRequest('/centres/', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload),
+          });
+          document.getElementById('testCentreId').value = result.id;
+          setStatus('tokenStatus', `Centre created:\n${JSON.stringify(result, null, 2)}`, 'success');
+        } catch (err) {
+          setStatus('tokenStatus', `Creating centre failed: ${err.message}`, 'error');
+        }
+      }
+
+      async function createTest() {
+        try {
+          if (!token) throw new Error('Please login first.');
+          const payload = {
+            name: document.getElementById('testName').value,
+            price: Number(document.getElementById('testPrice').value),
+          };
+          const centreId = document.getElementById('testCentreId').value;
+          const result = await apiRequest(`/centres/${centreId}/tests/`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload),
+          });
+          setStatus('tokenStatus', `Test created:\n${JSON.stringify(result, null, 2)}`, 'success');
+        } catch (err) {
+          setStatus('tokenStatus', `Creating test failed: ${err.message}`, 'error');
+        }
+      }
+
+      async function listCentres() {
+        try {
+          const result = await apiRequest('/centres/?limit=10&offset=0');
+          document.getElementById('centresOutput').textContent = JSON.stringify(result, null, 2);
+        } catch (err) {
+          document.getElementById('centresOutput').textContent = `Failed: ${err.message}`;
+        }
+      }
+    </script>
+  </body>
+</html>

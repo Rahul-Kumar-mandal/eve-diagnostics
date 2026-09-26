@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: eve
+      POSTGRES_PASSWORD: eve_password
+      POSTGRES_DB: eve_healthcare
+    ports:
+      - "5432:5432"
+    volumes:
+      - eve_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eve -d eve_healthcare"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://eve:eve_password@db:5432/eve_healthcare
+      JWT_SECRET_KEY: please-change-this-to-a-long-random-string
+      WEBHOOK_SHARED_SECRET: mock_provider_shared_secret
+    ports:
+      - "8000:8000"
+
+volumes:
+  eve_pg_data:
